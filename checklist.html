@@ -1,4 +1,4 @@
-<!DOCTYPE html><!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -718,17 +718,22 @@
         updateJobInfo();
 
         // Load checklist items
-        const { data: checklistItems, error: checklistError } = await sb
+        const { data: saved, error: checklistError } = await sb
           .from('checklist_items')
-          .select('*')
+          .select('question_id, is_checked')
           .eq('job_id', jobId);
 
         if (checklistError) {
           console.error('Error loading checklist:', checklistError);
         } else {
-          checklistItems?.forEach(item => {
-            if (item.is_checked) {
-              checkedItems.add(item.question_id);
+          // Then apply saved state:
+          saved?.forEach(row => {
+            const cb = document.querySelector(
+              `input[data-question-id="${row.question_id}"]` 
+            );
+            if (cb && row.is_checked) {
+              cb.checked = true;
+              // apply green styling to parent
             }
           });
         }
@@ -868,13 +873,16 @@
 
       try {
         // Save to Supabase
-        await sb.from('checklist_items').upsert({
-          job_id: jobId,
-          question_id: questionId,
-          is_checked: isChecked,
-          user_id: currentUser.id,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'job_id,question_id' });
+        await sb.from('checklist_items').upsert(
+          {
+            job_id:      jobId,
+            question_id: questionId,      // must be a number e.g. 1, 2, 3
+            is_checked: checkbox.checked,
+            user_id:     currentUser.id,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'job_id,question_id' }
+        );
 
         // Update local state
         if (isChecked) {
@@ -1076,12 +1084,19 @@
             head: [['', 'Requirement', 'Status']],
             body: rows,
             columnStyles: {
-              0: { cellWidth: 10, halign: 'center' },
-              1: { cellWidth: 150 },
-              2: { cellWidth: 25 }
+              0: { cellWidth: 8, halign: 'center' },  // ✓/✗
+              1: { cellWidth: 147 },                    // question text
+              2: { cellWidth: 22 }                      // status
             },
-            styles: { fontSize: 8, cellPadding: 3 },
+            styles: {
+              fontSize: 8,
+              cellPadding: 2,
+              overflow: 'linebreak',
+              cellWidth: 'wrap'
+            },
             headStyles: { fillColor: [26, 107, 60] },
+            tableWidth: 'auto',
+            margin: { left: 14, right: 14 },
             didParseCell: (data) => {
               if (data.column.index === 0) {
                 data.cell.styles.textColor = data.cell.raw === '✓'
@@ -1115,13 +1130,20 @@
               startY: yPos,
               body: rows,
               columnStyles: {
-                0: { cellWidth: 10, halign: 'center' },
-                1: { cellWidth: 120 },
-                2: { cellWidth: 30 },
-                3: { cellWidth: 25 }
+                0: { cellWidth: 8, halign: 'center' },  // ✓/✗
+                1: { cellWidth: 147 },                    // question text
+                2: { cellWidth: 35 },                     // NEC reference
+                3: { cellWidth: 22 }                      // status
               },
-              styles: { fontSize: 8, cellPadding: 3 },
+              styles: {
+                fontSize: 8,
+                cellPadding: 2,
+                overflow: 'linebreak',
+                cellWidth: 'wrap'
+              },
               headStyles: { fillColor: [26, 107, 60] },
+              tableWidth: 'auto',
+              margin: { left: 14, right: 14 },
               didParseCell: (data) => {
                 if (data.column.index === 0) {
                   data.cell.styles.textColor = data.cell.raw === '✓'
